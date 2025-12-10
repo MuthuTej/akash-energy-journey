@@ -131,7 +131,7 @@ export const ScrollHero = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.5 }}
         >
-          Hi, I'm Asha — your guide through this renewable energy journey.
+          Hi, I'm Akash Guru — your guide through this renewable energy journey.
           Let's discover how organic materials become sustainable power.
         </motion.p>
 

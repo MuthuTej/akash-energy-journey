@@ -13,7 +13,7 @@ import { SceneEmissions } from "./scenes/SceneEmissions";
 import { SceneSummary } from "./scenes/SceneSummary";
 
 const SECTIONS = [
-  { id: "intro", label: "Intro", time: "0:00", duration: 8, narration: "Hi, I'm Asha — let's explore how biomass becomes clean electricity, together." },
+  { id: "intro", label: "Intro", time: "0:00", duration: 8, narration: "Hi, I'm Akash Guru — let's explore how biomass becomes clean electricity, together." },
   { id: "feedstock", label: "Feedstock", time: "0:08", duration: 17, narration: "We start with biomass — wood chips, agricultural residues, or energy crops. They're weighed, tested for moisture, and stored in hoppers. Drier fuel means more energy!" },
   { id: "preprocessing", label: "Processing", time: "0:25", duration: 15, narration: "The chipper reduces particle size while the rotary dryer removes moisture. Watch the energy value climb as water content drops." },
   { id: "combustion", label: "Combustion", time: "0:40", duration: 30, narration: "We feed dry chips into the boiler — hotter, drier fuel means more energy! Staged combustion with primary and secondary air keeps oxygen levels optimal and CO emissions low." },

@@ -5,7 +5,7 @@ interface NarratorCaptionProps {
   speaker?: string;
 }
 
-export const NarratorCaption = ({ text, speaker = "Asha" }: NarratorCaptionProps) => {
+export const NarratorCaption = ({ text, speaker = "Akash Guru" }: NarratorCaptionProps) => {
   return (
     <motion.div
       className="max-w-2xl mx-auto"

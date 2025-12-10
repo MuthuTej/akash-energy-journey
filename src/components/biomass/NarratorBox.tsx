@@ -22,7 +22,7 @@ export const NarratorBox = ({ text, isVisible }: NarratorBoxProps) => {
             </div>
             <div>
               <span className="text-xs text-primary font-medium block mb-1">
-                Asha
+                Akash Guru
               </span>
               <p className="narrator-text">{text}</p>
             </div>
