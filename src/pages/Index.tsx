@@ -1,7 +1,7 @@
-import { BiomassExplainer } from "@/components/biomass/BiomassExplainer";
+import { ScrollExplainer } from "@/components/biomass/ScrollExplainer";
 
 const Index = () => {
-  return <BiomassExplainer />;
+  return <ScrollExplainer />;
 };
 
 export default Index;
