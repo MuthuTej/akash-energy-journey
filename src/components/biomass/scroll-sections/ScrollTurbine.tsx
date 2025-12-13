@@ -4,13 +4,16 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { NarratorCaption } from "../NarratorCaption";
 import { SteamParticles } from "../ParticleEffects";
+import { useSimulation } from "@/contexts/SimulationContext";
+import { CircularGauge, NumericCounter } from "../OutputDisplay";
 
 gsap.registerPlugin(ScrollTrigger);
 
 export const ScrollTurbine = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const [rpm, setRpm] = useState(0);
+  const { outputs } = useSimulation();
   const [bladeRotation, setBladeRotation] = useState(0);
+  const [scrollProgress, setScrollProgress] = useState(0);
 
   useEffect(() => {
     if (!sectionRef.current) return;
@@ -19,7 +22,6 @@ export const ScrollTurbine = () => {
     let startTime = Date.now();
 
     const ctx = gsap.context(() => {
-      // Pin for detailed turbine view
       ScrollTrigger.create({
         trigger: sectionRef.current,
         start: "top top",
@@ -27,15 +29,16 @@ export const ScrollTurbine = () => {
         pin: true,
         pinSpacing: true,
         onUpdate: (self) => {
-          setRpm(Math.min(3000, self.progress * 3500));
+          setScrollProgress(self.progress);
         },
       });
     }, sectionRef);
 
-    // Continuous blade rotation
+    // Continuous blade rotation based on turbine speed
     const animate = () => {
       const elapsed = Date.now() - startTime;
-      setBladeRotation((elapsed / 1000) * 180); // 180 degrees per second
+      const speedFactor = outputs.turbineSpeed / 3000;
+      setBladeRotation((elapsed / 1000) * 180 * speedFactor);
       animationFrame = requestAnimationFrame(animate);
     };
     animate();
@@ -44,7 +47,11 @@ export const ScrollTurbine = () => {
       ctx.revert();
       cancelAnimationFrame(animationFrame);
     };
-  }, []);
+  }, [outputs.turbineSpeed]);
+
+  // Visual effects based on simulation
+  const speedIntensity = (outputs.turbineSpeed - 2400) / 600;
+  const showSparks = outputs.turbineSpeed > 2700;
 
   return (
     <section
@@ -174,7 +181,7 @@ export const ScrollTurbine = () => {
               </text>
             </motion.g>
 
-            {/* Velocity lines */}
+            {/* Velocity lines - animated based on speed */}
             {[0, 1, 2].map((i) => (
               <motion.path
                 key={i}
@@ -183,21 +190,26 @@ export const ScrollTurbine = () => {
                 stroke="hsl(200 80% 70%)"
                 strokeWidth="2"
                 strokeDasharray="6 4"
-                initial={{ pathLength: 0, opacity: 0 }}
-                whileInView={{ pathLength: 1, opacity: 0.5 }}
-                viewport={{ once: false }}
-                transition={{ delay: 0.5 + i * 0.2, duration: 0.8 }}
+                animate={{
+                  strokeDashoffset: [0, -20],
+                }}
+                transition={{
+                  duration: Math.max(0.3, 1 - speedIntensity * 0.5),
+                  repeat: Infinity,
+                  ease: "linear",
+                }}
+                opacity={0.5}
               />
             ))}
 
             {/* RPM indicator */}
             <rect x="250" y="240" width="100" height="30" rx="5" fill="hsl(220 18% 14%)" />
             <text x="300" y="260" textAnchor="middle" className="fill-primary text-[12px] font-mono font-medium">
-              {rpm.toFixed(0)} rpm
+              {outputs.turbineSpeed} rpm
             </text>
 
             {/* Sparkle effects near blades */}
-            {rpm > 1500 && [0, 1, 2].map((i) => (
+            {showSparks && [0, 1, 2].map((i) => (
               <motion.circle
                 key={`spark-${i}`}
                 cx={140 + i * 160}
@@ -231,8 +243,8 @@ export const ScrollTurbine = () => {
           >
             <span className="metric-label">Steam Inlet</span>
             <div className="flex items-baseline gap-1 mt-1">
-              <span className="metric-value">85</span>
-              <span className="text-xs text-muted-foreground">bar / 540°C</span>
+              <span className="metric-value">{outputs.boilerSteamPressure.toFixed(0)}</span>
+              <span className="text-xs text-muted-foreground">bar / {outputs.boilerSteamTemp}°C</span>
             </div>
           </motion.div>
 
@@ -245,7 +257,7 @@ export const ScrollTurbine = () => {
           >
             <span className="metric-label">Turbine Speed</span>
             <div className="flex items-baseline gap-1 mt-1">
-              <span className="metric-value">{rpm.toFixed(0)}</span>
+              <span className="metric-value">{outputs.turbineSpeed}</span>
               <span className="text-xs text-muted-foreground">rpm</span>
             </div>
           </motion.div>
@@ -270,13 +282,13 @@ export const ScrollTurbine = () => {
           >
             <span className="metric-label">Efficiency</span>
             <div className="flex items-baseline gap-1 mt-1">
-              <span className="metric-value">92</span>
+              <span className="metric-value">{(85 + speedIntensity * 7).toFixed(0)}</span>
               <span className="text-xs text-muted-foreground">%</span>
             </div>
           </motion.div>
         </div>
 
-        <NarratorCaption text="The turbine converts steam's push into rotation. High-pressure steam expands through three stages — HP, MP, and LP — spinning the shaft at 3000 rpm to drive the generator." />
+        <NarratorCaption text={`Steam at ${outputs.boilerSteamPressure.toFixed(0)} bar expands through HP, MP, and LP stages, spinning the shaft at ${outputs.turbineSpeed} RPM. This mechanical energy will power the generator!`} />
       </motion.div>
     </section>
   );

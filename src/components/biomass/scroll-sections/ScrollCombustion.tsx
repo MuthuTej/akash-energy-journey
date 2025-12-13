@@ -4,19 +4,20 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { NarratorCaption } from "../NarratorCaption";
 import { FlameEffect, SteamParticles } from "../ParticleEffects";
+import { useSimulation } from "@/contexts/SimulationContext";
+import { CircularGauge, VerticalMeter, NumericCounter } from "../OutputDisplay";
 
 gsap.registerPlugin(ScrollTrigger);
 
 export const ScrollCombustion = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const [o2Level, setO2Level] = useState(21);
-  const [coLevel, setCoLevel] = useState(0.05);
+  const { inputs, outputs } = useSimulation();
+  const [scrollProgress, setScrollProgress] = useState(0);
 
   useEffect(() => {
     if (!sectionRef.current) return;
 
     const ctx = gsap.context(() => {
-      // Pin this section for detailed viewing
       ScrollTrigger.create({
         trigger: sectionRef.current,
         start: "top top",
@@ -24,15 +25,17 @@ export const ScrollCombustion = () => {
         pin: true,
         pinSpacing: true,
         onUpdate: (self) => {
-          // Simulate combustion optimization
-          setO2Level(21 - self.progress * 3);
-          setCoLevel(Math.max(0.01, 0.05 - self.progress * 0.03));
+          setScrollProgress(self.progress);
         },
       });
     }, sectionRef);
 
     return () => ctx.revert();
   }, []);
+
+  // Visual intensity based on combustion temp
+  const flameIntensity = (inputs.combustionTemp - 700) / 400;
+  const glowOpacity = 0.2 + flameIntensity * 0.3;
 
   return (
     <section
@@ -42,10 +45,10 @@ export const ScrollCombustion = () => {
     >
       <div className="absolute inset-0 bg-gradient-to-b from-card/50 via-background to-card/30" />
 
-      {/* Ambient glow effect */}
+      {/* Ambient glow effect - intensity based on combustion temp */}
       <motion.div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-accent/20 rounded-full blur-[100px]"
-        animate={{ opacity: [0.3, 0.5, 0.3] }}
+        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-accent rounded-full blur-[100px]"
+        animate={{ opacity: [glowOpacity * 0.6, glowOpacity, glowOpacity * 0.6] }}
         transition={{ duration: 2, repeat: Infinity }}
       />
 
@@ -90,7 +93,7 @@ export const ScrollCombustion = () => {
               {/* Inner chamber */}
               <rect x="70" y="60" width="260" height="260" rx="5" fill="hsl(220 20% 12%)" />
 
-              {/* Steam tubes */}
+              {/* Steam tubes - activity based on feed rate */}
               {[90, 130, 170, 210, 250, 290].map((x, i) => (
                 <motion.g key={i}>
                   <rect
@@ -101,7 +104,7 @@ export const ScrollCombustion = () => {
                     rx="6"
                     fill="hsl(215 12% 40%)"
                   />
-                  {/* Steam flow dots */}
+                  {/* Steam flow dots - speed based on steam production */}
                   <motion.circle
                     cx={x + 6}
                     cy="90"
@@ -110,7 +113,7 @@ export const ScrollCombustion = () => {
                     animate={{ y: [0, -40, -80], opacity: [0.8, 0.5, 0] }}
                     transition={{
                       delay: i * 0.15,
-                      duration: 2,
+                      duration: Math.max(0.5, 2 - (outputs.fuelEnergyInput / 20000)),
                       repeat: Infinity,
                     }}
                   />
@@ -124,7 +127,6 @@ export const ScrollCombustion = () => {
               ))}
 
               {/* Air flow indicators */}
-              {/* Primary air */}
               {[120, 200, 280].map((x, i) => (
                 <motion.g key={`p-${i}`}>
                   <motion.path
@@ -170,8 +172,14 @@ export const ScrollCombustion = () => {
               </text>
             </svg>
 
-            {/* Flame effect */}
-            <div className="absolute bottom-[22%] left-1/2 -translate-x-1/2">
+            {/* Flame effect - intensity based on combustion temp */}
+            <div 
+              className="absolute bottom-[22%] left-1/2 -translate-x-1/2"
+              style={{ 
+                transform: `translateX(-50%) scale(${0.8 + flameIntensity * 0.4})`,
+                filter: `brightness(${0.8 + flameIntensity * 0.4})`,
+              }}
+            >
               <FlameEffect width={100} height={120} />
             </div>
 
@@ -179,80 +187,35 @@ export const ScrollCombustion = () => {
             <SteamParticles count={8} originX={50} originY={15} spread={30} />
           </div>
 
-          {/* Metrics panel */}
+          {/* Metrics panel with live simulation values */}
           <div className="flex flex-col gap-4 w-full max-w-xs">
-            {/* O2 Gauge */}
-            <motion.div
-              className="metric-card"
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: false }}
-            >
-              <span className="metric-label">O₂ Level</span>
-              <div className="flex items-center gap-4 mt-2">
-                <div className="relative w-20 h-20">
-                  <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                    <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--muted))" strokeWidth="8" />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="none"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth="8"
-                      strokeLinecap="round"
-                      strokeDasharray={251}
-                      strokeDashoffset={251 - (o2Level / 25) * 251}
-                      className="transition-all duration-300"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="metric-value text-sm">{o2Level.toFixed(1)}%</span>
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Optimal: 18-21%
-                </div>
-              </div>
-            </motion.div>
+            <NumericCounter
+              value={inputs.combustionTemp}
+              label="Bed Temperature"
+              unit="°C"
+              color="hsl(var(--accent))"
+              tooltip="Temperature in the combustion zone"
+            />
 
-            {/* CO Gauge */}
-            <motion.div
-              className="metric-card"
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: false }}
-              transition={{ delay: 0.1 }}
-            >
-              <span className="metric-label">CO Level</span>
+            <div className="metric-card">
+              <span className="metric-label">Effective LHV</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="metric-value">{(coLevel * 100).toFixed(1)}</span>
-                <span className="text-xs text-muted-foreground">ppm</span>
+                <span className="metric-value text-primary">{(outputs.effectiveLHV / 1000).toFixed(2)}</span>
+                <span className="text-xs text-muted-foreground">MJ/kg</span>
               </div>
-              <div className="mt-2 h-2 bg-muted rounded-full">
-                <div
-                  className="h-full bg-primary rounded-full transition-all duration-300"
-                  style={{ width: `${coLevel * 100}%` }}
-                />
-              </div>
-            </motion.div>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Adjusted for {inputs.moistureContent}% moisture
+              </p>
+            </div>
 
-            {/* Temperature */}
-            <motion.div
-              className="metric-card"
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: false }}
-              transition={{ delay: 0.2 }}
-            >
-              <span className="metric-label">Bed Temperature</span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="metric-value text-accent">850</span>
-                <span className="text-xs text-muted-foreground">°C</span>
-              </div>
-            </motion.div>
+            <NumericCounter
+              value={outputs.fuelEnergyInput}
+              label="Fuel Energy Input"
+              unit="kW"
+              decimals={0}
+              tooltip="Total thermal energy from fuel combustion"
+            />
 
-            {/* Combustion type */}
             <motion.div
               className="metric-card"
               initial={{ opacity: 0, x: 30 }}
@@ -260,7 +223,7 @@ export const ScrollCombustion = () => {
               viewport={{ once: false }}
               transition={{ delay: 0.3 }}
             >
-              <span className="metric-label">Type</span>
+              <span className="metric-label">Combustion Type</span>
               <p className="text-primary font-medium mt-1">Grate-Fired</p>
               <p className="text-xs text-muted-foreground mt-1">
                 Staged combustion for efficiency
@@ -270,7 +233,7 @@ export const ScrollCombustion = () => {
         </div>
 
         <div className="mt-8">
-          <NarratorCaption text="We feed dry chips into the boiler — hotter, drier fuel means more energy! Staged combustion with primary and secondary air keeps O₂ levels optimal and CO emissions low." />
+          <NarratorCaption text={`Feeding ${inputs.feedRate.toLocaleString()} kg/hr of ${inputs.biomassType} at ${inputs.moistureContent}% moisture. At ${inputs.combustionTemp}°C, we're generating ${(outputs.fuelEnergyInput / 1000).toFixed(1)} MW of thermal energy!`} />
         </div>
       </motion.div>
     </section>

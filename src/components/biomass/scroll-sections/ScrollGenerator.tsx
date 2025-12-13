@@ -3,12 +3,14 @@ import { motion } from "framer-motion";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { NarratorCaption } from "../NarratorCaption";
+import { useSimulation } from "@/contexts/SimulationContext";
+import { CircularGauge, NumericCounter } from "../OutputDisplay";
 
 gsap.registerPlugin(ScrollTrigger);
 
 export const ScrollGenerator = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const [power, setPower] = useState(0);
+  const { outputs } = useSimulation();
   const [rotation, setRotation] = useState(0);
 
   useEffect(() => {
@@ -22,15 +24,14 @@ export const ScrollGenerator = () => {
         trigger: sectionRef.current,
         start: "top 60%",
         end: "bottom 40%",
-        onUpdate: (self) => {
-          setPower(Math.min(25, self.progress * 30));
-        },
+        toggleClass: "active",
       });
     }, sectionRef);
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
-      setRotation((elapsed / 1000) * 120);
+      const speedFactor = outputs.turbineSpeed / 3000;
+      setRotation((elapsed / 1000) * 120 * speedFactor);
       animationFrame = requestAnimationFrame(animate);
     };
     animate();
@@ -39,7 +40,11 @@ export const ScrollGenerator = () => {
       ctx.revert();
       cancelAnimationFrame(animationFrame);
     };
-  }, []);
+  }, [outputs.turbineSpeed]);
+
+  // Power output in MW
+  const powerMW = outputs.electricalPowerOutput / 1000;
+  const glowIntensity = Math.min(powerMW / 25, 1);
 
   return (
     <section
@@ -49,10 +54,13 @@ export const ScrollGenerator = () => {
     >
       <div className="absolute inset-0 bg-gradient-to-b from-card/30 via-background to-card/30" />
 
-      {/* Electric glow effect */}
+      {/* Electric glow effect - intensity based on power output */}
       <motion.div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-accent/20 rounded-full blur-[100px]"
-        animate={{ opacity: [0.2, 0.4, 0.2], scale: [0.9, 1.1, 0.9] }}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-accent rounded-full blur-[100px]"
+        animate={{ 
+          opacity: [0.1 + glowIntensity * 0.1, 0.2 + glowIntensity * 0.2, 0.1 + glowIntensity * 0.1], 
+          scale: [0.9, 1.1, 0.9] 
+        }}
         transition={{ duration: 3, repeat: Infinity }}
       />
 
@@ -104,14 +112,24 @@ export const ScrollGenerator = () => {
                 style={{ transformOrigin: "left" }}
               />
 
-              {/* Generator body */}
+              {/* Generator body - glow based on power output */}
               <motion.g
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: false }}
                 transition={{ delay: 0.5 }}
               >
-                <rect x="180" y="100" width="150" height="150" fill="hsl(35 80% 45%)" rx="10" />
+                <motion.rect 
+                  x="180" 
+                  y="100" 
+                  width="150" 
+                  height="150" 
+                  fill="hsl(35 80% 45%)" 
+                  rx="10"
+                  animate={{
+                    filter: `drop-shadow(0 0 ${10 + glowIntensity * 20}px hsl(35 80% 50%))`,
+                  }}
+                />
                 <rect x="190" y="110" width="130" height="130" fill="hsl(35 70% 35%)" rx="8" />
                 
                 {/* Rotor */}
@@ -165,8 +183,8 @@ export const ScrollGenerator = () => {
                 </text>
               </motion.g>
 
-              {/* Electric sparks */}
-              {power > 10 && [0, 1, 2, 3].map((i) => (
+              {/* Electric sparks - more intense with higher power */}
+              {powerMW > 5 && [0, 1, 2, 3].map((i) => (
                 <motion.circle
                   key={`spark-${i}`}
                   cx={340 + Math.random() * 30}
@@ -197,7 +215,7 @@ export const ScrollGenerator = () => {
                   POWER OUTPUT
                 </text>
                 <text x="210" y="328" textAnchor="middle" className="fill-accent text-[16px] font-mono font-bold">
-                  {power.toFixed(1)} MW
+                  {powerMW.toFixed(1)} MW
                 </text>
               </motion.g>
             </svg>
@@ -213,18 +231,22 @@ export const ScrollGenerator = () => {
             >
               <span className="metric-label">Power Output</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="metric-value text-accent text-2xl">{power.toFixed(1)}</span>
+                <span className="metric-value text-accent text-2xl">{powerMW.toFixed(1)}</span>
                 <span className="text-sm text-muted-foreground">MW</span>
               </div>
               <div className="mt-3 h-3 bg-muted rounded-full overflow-hidden">
                 <motion.div
                   className="h-full rounded-full"
+                  animate={{ width: `${(powerMW / 30) * 100}%` }}
+                  transition={{ duration: 0.5 }}
                   style={{
-                    width: `${(power / 30) * 100}%`,
                     background: "linear-gradient(90deg, hsl(35 80% 45%), hsl(45 90% 55%))",
                   }}
                 />
               </div>
+              <p className="text-[10px] text-muted-foreground mt-2">
+                ≈ {Math.round(powerMW * 2000).toLocaleString()} homes powered
+              </p>
             </motion.div>
 
             <motion.div
@@ -248,10 +270,10 @@ export const ScrollGenerator = () => {
               viewport={{ once: false }}
               transition={{ delay: 0.2 }}
             >
-              <span className="metric-label">Frequency</span>
+              <span className="metric-label">Overall Efficiency</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="metric-value">50</span>
-                <span className="text-xs text-muted-foreground">Hz</span>
+                <span className="metric-value text-primary">{outputs.plantEfficiency.toFixed(1)}</span>
+                <span className="text-xs text-muted-foreground">%</span>
               </div>
             </motion.div>
 
@@ -273,7 +295,7 @@ export const ScrollGenerator = () => {
         </div>
 
         <div className="mt-12">
-          <NarratorCaption text="The generator turns rotation into electricity through electromagnetic induction. Spinning magnets inside copper coils create 25 megawatts of clean power — enough for 50,000 homes!" />
+          <NarratorCaption text={`The generator converts ${outputs.turbineSpeed} RPM rotation into ${powerMW.toFixed(1)} MW of electricity at ${outputs.plantEfficiency.toFixed(1)}% efficiency — enough to power about ${Math.round(powerMW * 2000).toLocaleString()} homes!`} />
         </div>
       </motion.div>
     </section>
