@@ -1,16 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { NarratorCaption } from "../NarratorCaption";
 import { SteamParticles } from "../ParticleEffects";
+import { useSimulation } from "@/contexts/SimulationContext";
+import { CircularGauge, VerticalMeter } from "../OutputDisplay";
 
 gsap.registerPlugin(ScrollTrigger);
 
 export const ScrollSteam = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const [pressure, setPressure] = useState(0);
-  const [temp, setTemp] = useState(200);
+  const { inputs, outputs } = useSimulation();
 
   useEffect(() => {
     if (!sectionRef.current) return;
@@ -20,15 +21,17 @@ export const ScrollSteam = () => {
         trigger: sectionRef.current,
         start: "top 60%",
         end: "bottom 40%",
-        onUpdate: (self) => {
-          setPressure(Math.min(85, self.progress * 100));
-          setTemp(Math.min(540, 200 + self.progress * 400));
-        },
+        toggleClass: "active",
       });
     }, sectionRef);
 
     return () => ctx.revert();
   }, []);
+
+  // Steam intensity based on pressure
+  const steamIntensity = outputs.boilerSteamPressure / 120;
+  // Estimated steam flow (simplified: proportional to energy input)
+  const steamFlow = Math.round((outputs.fuelEnergyInput / 1000) * 4);
 
   return (
     <section
@@ -38,10 +41,13 @@ export const ScrollSteam = () => {
     >
       <div className="absolute inset-0 bg-gradient-to-b from-card/30 via-background to-card/30" />
 
-      {/* Steam ambient effect */}
+      {/* Steam ambient effect - intensity based on pressure */}
       <motion.div
         className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-steam/10 rounded-full blur-[80px]"
-        animate={{ opacity: [0.2, 0.4, 0.2], scale: [1, 1.1, 1] }}
+        animate={{ 
+          opacity: [0.1 + steamIntensity * 0.1, 0.2 + steamIntensity * 0.2, 0.1 + steamIntensity * 0.1], 
+          scale: [1, 1.1, 1] 
+        }}
         transition={{ duration: 4, repeat: Infinity }}
       />
 
@@ -75,7 +81,7 @@ export const ScrollSteam = () => {
                 {[50, 80, 110, 140].map((x, i) => (
                   <g key={i}>
                     <rect x={x} y="95" width="8" height="150" fill="hsl(215 12% 45%)" rx="4" />
-                    {/* Water/steam flow */}
+                    {/* Water/steam flow - speed based on steam production */}
                     <motion.circle
                       cx={x + 4}
                       cy="200"
@@ -84,14 +90,14 @@ export const ScrollSteam = () => {
                       animate={{ y: [-80, -140] }}
                       transition={{
                         delay: i * 0.2,
-                        duration: 2,
+                        duration: Math.max(0.5, 2 - steamIntensity),
                         repeat: Infinity,
                       }}
                     />
                   </g>
                 ))}
 
-                {/* Heat source */}
+                {/* Heat source - intensity based on combustion temp */}
                 <motion.rect
                   x="40"
                   y="260"
@@ -99,7 +105,10 @@ export const ScrollSteam = () => {
                   height="15"
                   fill="hsl(25 90% 50%)"
                   rx="2"
-                  animate={{ opacity: [0.6, 1, 0.6] }}
+                  animate={{ 
+                    opacity: [0.5 + steamIntensity * 0.2, 0.8 + steamIntensity * 0.2, 0.5 + steamIntensity * 0.2],
+                    filter: [`brightness(${0.8 + steamIntensity * 0.4})`, `brightness(${1.2 + steamIntensity * 0.4})`, `brightness(${0.8 + steamIntensity * 0.4})`],
+                  }}
                   transition={{ duration: 1, repeat: Infinity }}
                 />
               </motion.g>
@@ -116,7 +125,7 @@ export const ScrollSteam = () => {
                 transition={{ delay: 0.3, duration: 0.5 }}
               />
 
-              {/* Superheater */}
+              {/* Superheater - glow based on temperature */}
               <motion.g
                 initial={{ opacity: 0, x: -20 }}
                 whileInView={{ opacity: 1, x: 0 }}
@@ -136,16 +145,17 @@ export const ScrollSteam = () => {
                   strokeWidth="6"
                 />
                 
-                {/* Glow effect */}
+                {/* Glow effect - intensity based on temp */}
                 <motion.rect
                   x="210"
                   y="90"
                   width="80"
                   height="120"
                   fill="hsl(25 90% 50%)"
-                  opacity={0.2}
                   rx="3"
-                  animate={{ opacity: [0.1, 0.3, 0.1] }}
+                  animate={{ 
+                    opacity: [0.1 + steamIntensity * 0.15, 0.25 + steamIntensity * 0.2, 0.1 + steamIntensity * 0.15] 
+                  }}
                   transition={{ duration: 1.5, repeat: Infinity }}
                 />
               </motion.g>
@@ -173,16 +183,16 @@ export const ScrollSteam = () => {
                   STEAM DRUM
                 </text>
                 
-                {/* Pressure gauge */}
+                {/* Pressure gauge - live value */}
                 <circle cx="420" cy="130" r="25" fill="hsl(220 18% 14%)" />
                 <text x="420" y="135" textAnchor="middle" className="fill-primary text-[10px] font-mono">
-                  {pressure.toFixed(0)} bar
+                  {outputs.boilerSteamPressure.toFixed(0)} bar
                 </text>
                 
-                {/* Temperature */}
+                {/* Temperature - live value */}
                 <rect x="395" y="160" width="50" height="20" fill="hsl(220 18% 14%)" rx="3" />
                 <text x="420" y="175" textAnchor="middle" className="fill-accent text-[9px] font-mono">
-                  {temp.toFixed(0)}°C
+                  {outputs.boilerSteamTemp}°C
                 </text>
 
                 {/* Steam output */}
@@ -205,40 +215,28 @@ export const ScrollSteam = () => {
             <SteamParticles count={6} originX={84} originY={12} spread={10} />
           </div>
 
-          {/* Metrics */}
+          {/* Metrics with live simulation values */}
           <div className="flex flex-col gap-4 w-full max-w-xs">
-            <motion.div
-              className="metric-card"
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: false }}
-            >
-              <span className="metric-label">Steam Pressure</span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="metric-value">{pressure.toFixed(0)}</span>
-                <span className="text-xs text-muted-foreground">bar</span>
-              </div>
-              <div className="mt-2 h-2 bg-muted rounded-full">
-                <motion.div
-                  className="h-full bg-primary rounded-full"
-                  style={{ width: `${(pressure / 100) * 100}%` }}
-                />
-              </div>
-            </motion.div>
-
-            <motion.div
-              className="metric-card"
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: false }}
-              transition={{ delay: 0.1 }}
-            >
-              <span className="metric-label">Steam Temperature</span>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span className="metric-value text-accent">{temp.toFixed(0)}</span>
-                <span className="text-xs text-muted-foreground">°C</span>
-              </div>
-            </motion.div>
+            <div className="flex gap-4 justify-center">
+              <CircularGauge
+                value={outputs.boilerSteamPressure}
+                max={120}
+                label="Steam Pressure"
+                unit="bar"
+                color="hsl(var(--primary))"
+                size="md"
+                tooltip="Pressure of superheated steam"
+              />
+              <CircularGauge
+                value={outputs.boilerSteamTemp}
+                max={600}
+                label="Steam Temp"
+                unit="°C"
+                color="hsl(var(--accent))"
+                size="md"
+                tooltip="Temperature after superheater"
+              />
+            </div>
 
             <motion.div
               className="metric-card"
@@ -249,10 +247,34 @@ export const ScrollSteam = () => {
             >
               <span className="metric-label">Steam Flow</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="metric-value">95</span>
+                <span className="metric-value">{steamFlow}</span>
                 <span className="text-xs text-muted-foreground">t/hr</span>
               </div>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Based on {(outputs.fuelEnergyInput / 1000).toFixed(1)} MW thermal input
+              </p>
             </motion.div>
+
+            <div className="flex gap-4 justify-center">
+              <VerticalMeter
+                value={outputs.waterLevel}
+                max={100}
+                label="Water Level"
+                unit="%"
+                height={70}
+                warningThreshold={75}
+                tooltip="Drum water level - must stay above 70%"
+              />
+              <VerticalMeter
+                value={outputs.plantEfficiency}
+                max={50}
+                label="Efficiency"
+                unit="%"
+                color="hsl(var(--primary))"
+                height={70}
+                tooltip="Current plant thermal efficiency"
+              />
+            </div>
 
             <motion.div
               className="metric-card bg-primary/10 border-primary/30"
@@ -263,14 +285,14 @@ export const ScrollSteam = () => {
             >
               <span className="text-primary text-sm">✨ Superheated Steam</span>
               <p className="text-xs text-muted-foreground mt-1">
-                Steam is heated beyond boiling point for maximum turbine efficiency
+                Steam heated to {outputs.boilerSteamTemp}°C for maximum turbine efficiency
               </p>
             </motion.div>
           </div>
         </div>
 
         <div className="mt-12">
-          <NarratorCaption text="Heat from combustion transforms water into high-pressure steam. The superheater pushes temperatures even higher — hotter steam means more power from our turbine!" />
+          <NarratorCaption text={`Heat from ${inputs.combustionTemp}°C combustion transforms water into ${outputs.boilerSteamPressure.toFixed(0)} bar steam. The superheater pushes it to ${outputs.boilerSteamTemp}°C — hotter steam means more power!`} />
         </div>
       </motion.div>
     </section>
