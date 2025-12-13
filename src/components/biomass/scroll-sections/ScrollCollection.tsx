@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { NarratorCaption } from "../NarratorCaption";
+import { useSimulation } from "@/contexts/SimulationContext";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -10,6 +11,7 @@ export const ScrollCollection = () => {
   const sectionRef = useRef<HTMLElement>(null);
   const truckRef = useRef<SVGGElement>(null);
   const treesRef = useRef<SVGGElement>(null);
+  const { inputs } = useSimulation();
 
   useEffect(() => {
     if (!sectionRef.current) return;
@@ -51,6 +53,9 @@ export const ScrollCollection = () => {
 
     return () => ctx.revert();
   }, []);
+
+  // Daily intake based on feed rate (24 hours)
+  const dailyIntake = Math.round((inputs.feedRate * 24) / 1000);
 
   return (
     <section
@@ -144,7 +149,7 @@ export const ScrollCollection = () => {
           </svg>
         </div>
 
-        {/* Metrics */}
+        {/* Metrics with LIVE VALUES */}
         <div className="flex flex-wrap justify-center gap-4 mb-12">
           <motion.div
             className="metric-card"
@@ -153,8 +158,8 @@ export const ScrollCollection = () => {
             viewport={{ once: false }}
             transition={{ delay: 0.2 }}
           >
-            <span className="metric-label">Sources</span>
-            <p className="text-primary font-medium mt-1">Wood, Crops, Residues</p>
+            <span className="metric-label">Fuel Type</span>
+            <p className="text-primary font-medium mt-1">{inputs.biomassType}</p>
           </motion.div>
           <motion.div
             className="metric-card"
@@ -165,9 +170,12 @@ export const ScrollCollection = () => {
           >
             <span className="metric-label">Daily Intake</span>
             <div className="flex items-baseline gap-1 mt-1">
-              <span className="metric-value">450</span>
+              <span className="metric-value">{dailyIntake}</span>
               <span className="text-xs text-muted-foreground">tonnes</span>
             </div>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              @ {(inputs.feedRate / 1000).toFixed(1)} t/hr
+            </p>
           </motion.div>
           <motion.div
             className="metric-card"
@@ -181,7 +189,7 @@ export const ScrollCollection = () => {
           </motion.div>
         </div>
 
-        <NarratorCaption text="Biomass begins its journey in sustainably managed forests and farms. Wood chips, agricultural residues, and energy crops are harvested and transported to our facility." />
+        <NarratorCaption text={`${inputs.biomassType} is harvested from sustainably managed sources. At ${(inputs.feedRate / 1000).toFixed(1)} t/hr, we need ${dailyIntake} tonnes delivered daily!`} />
       </motion.div>
     </section>
   );

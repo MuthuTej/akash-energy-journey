@@ -3,31 +3,53 @@ import { motion } from "framer-motion";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { NarratorCaption } from "../NarratorCaption";
+import { useSimulation, BIOMASS_TYPES } from "@/contexts/SimulationContext";
 
 gsap.registerPlugin(ScrollTrigger);
 
 export const ScrollPreprocessing = () => {
   const sectionRef = useRef<HTMLElement>(null);
   const [bladeRotation, setBladeRotation] = useState(0);
-  const [moisture, setMoisture] = useState(35);
+  const { inputs, outputs } = useSimulation();
 
   useEffect(() => {
     if (!sectionRef.current) return;
+
+    let animationFrame: number;
+    let startTime = Date.now();
+    
+    // Continuous blade rotation based on feed rate
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const speedFactor = inputs.feedRate / 10000;
+      setBladeRotation((elapsed / 1000) * 180 * speedFactor);
+      animationFrame = requestAnimationFrame(animate);
+    };
+    animate();
 
     const ctx = gsap.context(() => {
       ScrollTrigger.create({
         trigger: sectionRef.current,
         start: "top 50%",
         end: "bottom 50%",
-        onUpdate: (self) => {
-          setBladeRotation(self.progress * 720);
-          setMoisture(Math.max(15, 35 - self.progress * 20));
-        },
+        toggleClass: "active",
       });
     }, sectionRef);
 
-    return () => ctx.revert();
-  }, []);
+    return () => {
+      ctx.revert();
+      cancelAnimationFrame(animationFrame);
+    };
+  }, [inputs.feedRate]);
+
+  // Calculate LHV improvement from drying
+  const baseLHV = BIOMASS_TYPES[inputs.biomassType].lhv;
+  const dryLHV = baseLHV * 0.95; // Assuming near-dry fuel
+  const currentLHV = outputs.effectiveLHV;
+  const lhvImprovement = ((dryLHV - currentLHV) / currentLHV * 100).toFixed(0);
+
+  // Dryer speed based on moisture content (more moisture = slower drying)
+  const dryerSpeed = Math.max(0.3, 1 - inputs.moistureContent / 100);
 
   return (
     <section
@@ -55,7 +77,7 @@ export const ScrollPreprocessing = () => {
               <rect x="50" y="100" width="140" height="120" fill="hsl(215 20% 28%)" rx="5" />
               <rect x="60" y="110" width="120" height="100" fill="hsl(220 20% 12%)" rx="3" />
               
-              {/* Rotating blade */}
+              {/* Rotating blade - speed based on feed rate */}
               <g style={{ transform: `rotate(${bladeRotation}deg)`, transformOrigin: "120px 160px" }}>
                 {[0, 60, 120, 180, 240, 300].map((angle, i) => (
                   <rect
@@ -76,11 +98,13 @@ export const ScrollPreprocessing = () => {
               {/* Input */}
               <path d="M20 80 L60 100 L60 140 L20 120 Z" fill="hsl(215 20% 32%)" />
               
-              {/* Particles entering */}
+              {/* Particles entering - speed based on feed rate */}
               <motion.g
-                initial={{ x: 0 }}
                 animate={{ x: [0, 30, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
+                transition={{ 
+                  duration: Math.max(0.5, 3 - inputs.feedRate / 5000), 
+                  repeat: Infinity 
+                }}
               >
                 <rect x="25" y="95" width="12" height="8" fill="hsl(30 50% 38%)" rx="2" />
                 <rect x="30" y="108" width="10" height="6" fill="hsl(25 45% 42%)" rx="1" />
@@ -113,8 +137,8 @@ export const ScrollPreprocessing = () => {
               {/* Inner */}
               <rect x="295" y="115" width="190" height="90" fill="hsl(220 20% 12%)" />
               
-              {/* Rotating flights */}
-              <g style={{ transform: `rotate(${-bladeRotation * 0.5}deg)`, transformOrigin: "390px 160px" }}>
+              {/* Rotating flights - speed based on moisture (wetter = slower) */}
+              <g style={{ transform: `rotate(${-bladeRotation * dryerSpeed}deg)`, transformOrigin: "390px 160px" }}>
                 {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (
                   <line
                     key={i}
@@ -132,7 +156,7 @@ export const ScrollPreprocessing = () => {
                 ))}
               </g>
 
-              {/* Heat indicator */}
+              {/* Heat indicator - intensity based on combustion temp */}
               <motion.rect
                 x="300"
                 y="215"
@@ -147,20 +171,20 @@ export const ScrollPreprocessing = () => {
                 HOT AIR FLOW
               </text>
 
-              {/* Steam escaping */}
+              {/* Steam escaping - more steam with higher moisture */}
               {[320, 370, 420, 470].map((x, i) => (
                 <motion.ellipse
                   key={i}
                   cx={x}
                   cy={105}
-                  rx={8}
-                  ry={5}
+                  rx={6 + (inputs.moistureContent / 20)}
+                  ry={4 + (inputs.moistureContent / 30)}
                   fill="hsl(200 20% 80%)"
                   initial={{ y: 0, opacity: 0.5 }}
-                  animate={{ y: -20, opacity: 0 }}
+                  animate={{ y: -25, opacity: 0 }}
                   transition={{
-                    delay: i * 0.3,
-                    duration: 2,
+                    delay: i * 0.2,
+                    duration: Math.max(1, 3 - inputs.moistureContent / 20),
                     repeat: Infinity,
                   }}
                 />
@@ -175,7 +199,7 @@ export const ScrollPreprocessing = () => {
             <g>
               <path d="M510 145 L560 125 L560 195 L510 175 Z" fill="hsl(215 20% 32%)" />
               
-              {/* Dried particles */}
+              {/* Dried particles - color changes based on moisture */}
               {[0, 1, 2].map((i) => (
                 <motion.rect
                   key={i}
@@ -183,7 +207,7 @@ export const ScrollPreprocessing = () => {
                   y={145 + i * 15}
                   width={8}
                   height={6}
-                  fill="hsl(35 50% 45%)"
+                  fill={`hsl(${35 - inputs.moistureContent / 3} ${50 + (55 - inputs.moistureContent)}% 45%)`}
                   rx="1"
                   initial={{ x: 510 }}
                   animate={{ x: 580 }}
@@ -227,15 +251,16 @@ export const ScrollPreprocessing = () => {
             viewport={{ once: false }}
             transition={{ delay: 0.1 }}
           >
-            <span className="metric-label">Output Moisture</span>
+            <span className="metric-label">Current Moisture</span>
             <div className="flex items-baseline gap-1 mt-1">
-              <span className="metric-value">{moisture.toFixed(0)}</span>
+              <span className="metric-value">{inputs.moistureContent}</span>
               <span className="text-xs text-muted-foreground">%</span>
             </div>
             <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary rounded-full transition-all duration-300"
-                style={{ width: `${moisture}%` }}
+              <motion.div
+                className="h-full bg-primary rounded-full"
+                animate={{ width: `${inputs.moistureContent}%` }}
+                transition={{ duration: 0.3 }}
               />
             </div>
           </motion.div>
@@ -247,14 +272,15 @@ export const ScrollPreprocessing = () => {
             viewport={{ once: false }}
             transition={{ delay: 0.2 }}
           >
-            <span className="metric-label">LHV Increase</span>
+            <span className="metric-label">Effective LHV</span>
             <div className="flex items-baseline gap-1 mt-1">
-              <span className="metric-value text-primary">+25%</span>
+              <span className="metric-value text-primary">{(outputs.effectiveLHV / 1000).toFixed(2)}</span>
+              <span className="text-xs text-muted-foreground">MJ/kg</span>
             </div>
           </motion.div>
         </div>
 
-        <NarratorCaption text="The chipper reduces particle size while the rotary dryer removes moisture. Watch the energy value climb as water content drops — drier fuel means more power!" />
+        <NarratorCaption text={`The chipper processes ${inputs.biomassType} while the rotary dryer reduces moisture from ${inputs.moistureContent}%. Lower moisture = higher effective heating value (${(outputs.effectiveLHV / 1000).toFixed(2)} MJ/kg)!`} />
       </motion.div>
     </section>
   );

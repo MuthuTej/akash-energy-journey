@@ -3,12 +3,14 @@ import { motion } from "framer-motion";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { NarratorCaption } from "../NarratorCaption";
+import { useSimulation } from "@/contexts/SimulationContext";
 
 gsap.registerPlugin(ScrollTrigger);
 
 export const ScrollStorage = () => {
   const sectionRef = useRef<HTMLElement>(null);
   const [fillLevel, setFillLevel] = useState(0);
+  const { inputs } = useSimulation();
 
   useEffect(() => {
     if (!sectionRef.current) return;
@@ -27,6 +29,9 @@ export const ScrollStorage = () => {
 
     return () => ctx.revert();
   }, []);
+
+  // Single truck weight based on feed rate
+  const truckWeight = Math.round(20 + (inputs.feedRate / 1000) * 2);
 
   return (
     <section
@@ -60,7 +65,7 @@ export const ScrollStorage = () => {
                 <rect x="30" y="280" width="100" height="15" fill="hsl(215 15% 35%)" rx="2" />
                 <rect x="50" y="250" width="60" height="35" fill="hsl(220 18% 14%)" rx="3" />
                 <text x="80" y="272" textAnchor="middle" className="fill-primary text-[10px] font-mono">
-                  28.5 t
+                  {truckWeight} t
                 </text>
                 <text x="80" y="310" textAnchor="middle" className="fill-muted-foreground text-[9px]">
                   Weighbridge
@@ -149,7 +154,7 @@ export const ScrollStorage = () => {
             </svg>
           </div>
 
-          {/* Metrics panel */}
+          {/* Metrics panel with LIVE VALUES */}
           <div className="flex flex-col gap-4">
             <motion.div
               className="metric-card"
@@ -158,18 +163,16 @@ export const ScrollStorage = () => {
               viewport={{ once: false }}
               transition={{ delay: 0.2 }}
             >
-              <span className="metric-label">Moisture Content</span>
+              <span className="metric-label">Incoming Moisture</span>
               <div className="flex items-baseline gap-1 mt-1">
-                <span className="metric-value">35</span>
+                <span className="metric-value">{inputs.moistureContent}</span>
                 <span className="text-xs text-muted-foreground">%</span>
               </div>
               <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
                 <motion.div
                   className="h-full bg-accent rounded-full"
-                  initial={{ width: 0 }}
-                  whileInView={{ width: "35%" }}
-                  viewport={{ once: false }}
-                  transition={{ delay: 0.5, duration: 1 }}
+                  animate={{ width: `${inputs.moistureContent}%` }}
+                  transition={{ duration: 0.3 }}
                 />
               </div>
             </motion.div>
@@ -181,11 +184,8 @@ export const ScrollStorage = () => {
               viewport={{ once: false }}
               transition={{ delay: 0.3 }}
             >
-              <span className="metric-label">Storage Time</span>
-              <div className="flex items-baseline gap-1 mt-1">
-                <span className="metric-value">3-5</span>
-                <span className="text-xs text-muted-foreground">days</span>
-              </div>
+              <span className="metric-label">Fuel Type</span>
+              <p className="text-primary font-medium mt-1">{inputs.biomassType}</p>
             </motion.div>
 
             <motion.div
@@ -199,14 +199,15 @@ export const ScrollStorage = () => {
                 💡 Why moisture matters
               </span>
               <p className="text-xs text-muted-foreground mt-1">
-                Wet fuel = lower energy content. We aim for &lt;20% moisture.
+                At {inputs.moistureContent}% moisture, energy is lost evaporating water. 
+                {inputs.moistureContent > 30 ? " Consider drying!" : " Good level!"}
               </p>
             </motion.div>
           </div>
         </div>
 
         <div className="mt-12">
-          <NarratorCaption text="Each delivery is weighed and tested for moisture. We store enough biomass for several days of operation, letting it dry naturally before processing." />
+          <NarratorCaption text={`Each ${inputs.biomassType} delivery is weighed at ${truckWeight} tonnes and tested at ${inputs.moistureContent}% moisture. ${inputs.moistureContent > 25 ? "High moisture means we'll need more drying!" : "Good moisture level for efficient combustion!"}`} />
         </div>
       </motion.div>
     </section>
