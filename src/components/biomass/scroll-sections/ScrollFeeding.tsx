@@ -3,12 +3,13 @@ import { motion } from "framer-motion";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { NarratorCaption } from "../NarratorCaption";
+import { useSimulation } from "@/contexts/SimulationContext";
 
 gsap.registerPlugin(ScrollTrigger);
 
 export const ScrollFeeding = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const conveyorRef = useRef<SVGGElement>(null);
+  const { inputs, outputs } = useSimulation();
 
   useEffect(() => {
     if (!sectionRef.current) return;
@@ -33,6 +34,15 @@ export const ScrollFeeding = () => {
 
     return () => ctx.revert();
   }, []);
+
+  // Feed rate in t/hr for display
+  const feedRateTonnes = inputs.feedRate / 1000;
+  // Belt speed scales with feed rate (0.3 - 0.8 m/s)
+  const beltSpeed = 0.3 + (inputs.feedRate / 15000) * 0.5;
+  // Motor speed based on feed rate
+  const motorDuration = Math.max(0.5, 3 - (inputs.feedRate / 15000) * 2);
+  // Flame intensity based on combustion temp
+  const flameIntensity = (inputs.combustionTemp - 700) / 400;
 
   return (
     <section
@@ -74,13 +84,13 @@ export const ScrollFeeding = () => {
             </motion.g>
 
             {/* Conveyor belt */}
-            <g ref={conveyorRef}>
+            <g>
               <rect x="80" y="120" width="350" height="25" fill="hsl(215 20% 25%)" rx="3" />
               <rect x="85" y="125" width="340" height="15" fill="hsl(215 15% 18%)" rx="2" />
               
-              {/* Belt texture lines */}
+              {/* Belt texture lines - animated based on feed rate */}
               {[100, 150, 200, 250, 300, 350, 400].map((x, i) => (
-                <line
+                <motion.line
                   key={i}
                   x1={x}
                   y1="125"
@@ -88,12 +98,18 @@ export const ScrollFeeding = () => {
                   y2="140"
                   stroke="hsl(215 15% 25%)"
                   strokeWidth="2"
+                  animate={{ x: [0, -50, 0] }}
+                  transition={{
+                    duration: motorDuration,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
                 />
               ))}
 
               {/* Biomass particles on belt */}
               {[0, 1, 2, 3, 4].map((i) => (
-                <rect
+                <motion.rect
                   key={i}
                   className="feed-particle"
                   x={100 + i * 40}
@@ -106,7 +122,7 @@ export const ScrollFeeding = () => {
               ))}
             </g>
 
-            {/* Drive motor */}
+            {/* Drive motor - speed based on feed rate */}
             <motion.g
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
@@ -116,7 +132,7 @@ export const ScrollFeeding = () => {
               <circle cx="430" cy="132" r="20" fill="hsl(145 50% 35%)" />
               <motion.g
                 animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                transition={{ duration: motorDuration, repeat: Infinity, ease: "linear" }}
                 style={{ transformOrigin: "430px 132px" }}
               >
                 <line x1="420" y1="132" x2="440" y2="132" stroke="hsl(145 70% 50%)" strokeWidth="3" />
@@ -138,7 +154,7 @@ export const ScrollFeeding = () => {
                 strokeWidth="2"
               />
               
-              {/* Falling particles */}
+              {/* Falling particles - speed based on feed rate */}
               {[0, 1, 2].map((i) => (
                 <motion.rect
                   key={i}
@@ -151,14 +167,14 @@ export const ScrollFeeding = () => {
                   animate={{ y: [110 + i * 25, 190] }}
                   transition={{
                     delay: i * 0.3,
-                    duration: 1.5,
+                    duration: Math.max(0.5, 2 - (inputs.feedRate / 15000)),
                     repeat: Infinity,
                   }}
                 />
               ))}
             </motion.g>
 
-            {/* Boiler inlet indicator */}
+            {/* Boiler inlet indicator - glow based on combustion temp */}
             <motion.g
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
@@ -168,14 +184,17 @@ export const ScrollFeeding = () => {
               <rect x="470" y="200" width="100" height="80" fill="hsl(215 20% 22%)" rx="5" />
               <rect x="475" y="205" width="90" height="70" fill="hsl(220 20% 12%)" rx="3" />
               
-              {/* Flame hint */}
+              {/* Flame hint - intensity based on combustion temp */}
               <motion.ellipse
                 cx="520"
                 cy="250"
-                rx="20"
-                ry="15"
+                rx={15 + flameIntensity * 10}
+                ry={12 + flameIntensity * 6}
                 fill="hsl(25 90% 50%)"
-                animate={{ scale: [1, 1.1, 1], opacity: [0.7, 1, 0.7] }}
+                animate={{ 
+                  scale: [1, 1.1 + flameIntensity * 0.1, 1], 
+                  opacity: [0.6 + flameIntensity * 0.2, 0.9 + flameIntensity * 0.1, 0.6 + flameIntensity * 0.2] 
+                }}
                 transition={{ duration: 0.8, repeat: Infinity }}
               />
               
@@ -184,7 +203,7 @@ export const ScrollFeeding = () => {
               </text>
             </motion.g>
 
-            {/* Speed indicator */}
+            {/* Speed indicator - LIVE VALUES */}
             <motion.g
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
@@ -196,13 +215,13 @@ export const ScrollFeeding = () => {
                 FEED RATE
               </text>
               <text x="240" y="190" textAnchor="middle" className="fill-primary text-[12px] font-mono font-medium">
-                18.5 t/hr
+                {feedRateTonnes.toFixed(1)} t/hr
               </text>
             </motion.g>
           </svg>
         </div>
 
-        {/* Metrics */}
+        {/* Metrics with LIVE VALUES */}
         <div className="flex flex-wrap justify-center gap-4 mb-12">
           <motion.div
             className="metric-card"
@@ -212,7 +231,7 @@ export const ScrollFeeding = () => {
           >
             <span className="metric-label">Belt Speed</span>
             <div className="flex items-baseline gap-1 mt-1">
-              <span className="metric-value">0.5</span>
+              <span className="metric-value">{beltSpeed.toFixed(2)}</span>
               <span className="text-xs text-muted-foreground">m/s</span>
             </div>
           </motion.div>
@@ -226,7 +245,7 @@ export const ScrollFeeding = () => {
           >
             <span className="metric-label">Feed Rate</span>
             <div className="flex items-baseline gap-1 mt-1">
-              <span className="metric-value">18.5</span>
+              <span className="metric-value">{feedRateTonnes.toFixed(1)}</span>
               <span className="text-xs text-muted-foreground">t/hr</span>
             </div>
           </motion.div>
@@ -238,12 +257,12 @@ export const ScrollFeeding = () => {
             viewport={{ once: false }}
             transition={{ delay: 0.2 }}
           >
-            <span className="metric-label">Control</span>
-            <p className="text-primary font-medium mt-1 text-sm">Auto-regulated</p>
+            <span className="metric-label">Fuel Type</span>
+            <p className="text-primary font-medium mt-1 text-sm">{inputs.biomassType}</p>
           </motion.div>
         </div>
 
-        <NarratorCaption text="The conveyor belt delivers a precisely controlled flow of dried biomass into the boiler. Feed rate is automatically adjusted to match power demand." />
+        <NarratorCaption text={`The conveyor delivers ${feedRateTonnes.toFixed(1)} tonnes/hr of ${inputs.biomassType} at ${inputs.moistureContent}% moisture into the boiler. Adjust the feed rate to see the belt speed change!`} />
       </motion.div>
     </section>
   );

@@ -1,14 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { NarratorCaption } from "../NarratorCaption";
+import { useSimulation } from "@/contexts/SimulationContext";
 
 gsap.registerPlugin(ScrollTrigger);
 
 export const ScrollCondenser = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const [efficiency, setEfficiency] = useState(0);
+  const { inputs, outputs } = useSimulation();
 
   useEffect(() => {
     if (!sectionRef.current) return;
@@ -18,14 +19,17 @@ export const ScrollCondenser = () => {
         trigger: sectionRef.current,
         start: "top 60%",
         end: "bottom 40%",
-        onUpdate: (self) => {
-          setEfficiency(Math.min(88, self.progress * 100));
-        },
+        toggleClass: "active",
       });
     }, sectionRef);
 
     return () => ctx.revert();
   }, []);
+
+  // Cooling water flow scales with power output
+  const coolingFlow = Math.round(8000 + (outputs.electricalPowerOutput / 1000) * 400);
+  // Pump speed based on steam production
+  const pumpDuration = Math.max(0.8, 3 - (outputs.fuelEnergyInput / 30000) * 2);
 
   return (
     <section
@@ -58,11 +62,11 @@ export const ScrollCondenser = () => {
               >
                 <rect x="50" y="80" width="180" height="140" rx="10" fill="hsl(215 20% 28%)" stroke="hsl(215 15% 40%)" strokeWidth="2" />
                 
-                {/* Cooling tubes */}
+                {/* Cooling tubes - flow speed based on cooling demand */}
                 {[100, 130, 160, 190].map((y, i) => (
                   <g key={i}>
                     <line x1="60" y1={y} x2="220" y2={y} stroke="hsl(200 60% 50%)" strokeWidth="5" />
-                    {/* Water flow */}
+                    {/* Water flow - speed based on power output */}
                     <motion.circle
                       cx="60"
                       cy={y}
@@ -70,8 +74,8 @@ export const ScrollCondenser = () => {
                       fill="hsl(200 80% 70%)"
                       animate={{ x: [0, 160, 0] }}
                       transition={{
-                        delay: i * 0.3,
-                        duration: 3,
+                        delay: i * 0.2,
+                        duration: pumpDuration,
                         repeat: Infinity,
                         ease: "linear",
                       }}
@@ -85,13 +89,13 @@ export const ScrollCondenser = () => {
                   EXHAUST STEAM
                 </text>
                 
-                {/* Steam condensing */}
+                {/* Steam condensing - amount based on steam production */}
                 {[0, 1, 2].map((i) => (
                   <motion.circle
                     key={i}
                     cx={120 + i * 20}
                     cy={70}
-                    r={5}
+                    r={4 + (outputs.fuelEnergyInput / 20000)}
                     fill="hsl(200 80% 80%)"
                     animate={{
                       y: [0, 30],
@@ -129,7 +133,7 @@ export const ScrollCondenser = () => {
                 transition={{ delay: 0.3, duration: 0.8 }}
               />
 
-              {/* Feedwater pump */}
+              {/* Feedwater pump - speed based on steam production */}
               <motion.g
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
@@ -139,7 +143,7 @@ export const ScrollCondenser = () => {
                 <circle cx="320" cy="220" r="35" fill="hsl(215 20% 28%)" stroke="hsl(145 60% 45%)" strokeWidth="2" />
                 <motion.g
                   animate={{ rotate: 360 }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  transition={{ duration: pumpDuration, repeat: Infinity, ease: "linear" }}
                   style={{ transformOrigin: "320px 220px" }}
                 >
                   <line x1="300" y1="220" x2="340" y2="220" stroke="hsl(145 60% 50%)" strokeWidth="4" />
@@ -193,7 +197,7 @@ export const ScrollCondenser = () => {
             </svg>
           </div>
 
-          {/* Metrics panel */}
+          {/* Metrics panel with LIVE VALUES */}
           <div className="flex flex-col gap-4 w-full max-w-xs">
             <motion.div
               className="metric-card"
@@ -217,9 +221,12 @@ export const ScrollCondenser = () => {
             >
               <span className="metric-label">Cooling Water Flow</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="metric-value">15,000</span>
+                <span className="metric-value">{coolingFlow.toLocaleString()}</span>
                 <span className="text-xs text-muted-foreground">m³/hr</span>
               </div>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Scaled to {(outputs.electricalPowerOutput / 1000).toFixed(1)} MW output
+              </p>
             </motion.div>
 
             <motion.div
@@ -229,16 +236,17 @@ export const ScrollCondenser = () => {
               viewport={{ once: false }}
               transition={{ delay: 0.2 }}
             >
-              <span className="metric-label">Heat Recovery</span>
+              <span className="metric-label">Plant Efficiency</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="metric-value">{efficiency.toFixed(0)}</span>
+                <span className="metric-value">{outputs.plantEfficiency.toFixed(1)}</span>
                 <span className="text-xs text-muted-foreground">%</span>
               </div>
               <div className="mt-2 h-3 bg-muted rounded-full overflow-hidden">
                 <motion.div
                   className="h-full rounded-full"
+                  animate={{ width: `${(outputs.plantEfficiency / 50) * 100}%` }}
+                  transition={{ duration: 0.3 }}
                   style={{
-                    width: `${efficiency}%`,
                     background: "linear-gradient(90deg, hsl(145 60% 40%), hsl(145 70% 55%))",
                   }}
                 />
@@ -254,14 +262,14 @@ export const ScrollCondenser = () => {
             >
               <span className="text-primary text-sm">🔄 Zero Water Waste</span>
               <p className="text-xs text-muted-foreground mt-1">
-                All water is recycled in a closed loop system
+                All water recycled in closed loop — {coolingFlow.toLocaleString()} m³/hr flow
               </p>
             </motion.div>
           </div>
         </div>
 
         <div className="mt-12">
-          <NarratorCaption text="After the turbine, exhaust steam condenses back to water. Pumps return it to the boiler in a closed loop — no water wasted, and we recover as much heat as possible!" />
+          <NarratorCaption text={`Exhaust steam condenses back to water. The pump returns it to the boiler at ${coolingFlow.toLocaleString()} m³/hr — achieving ${outputs.plantEfficiency.toFixed(1)}% overall efficiency!`} />
         </div>
       </motion.div>
     </section>
