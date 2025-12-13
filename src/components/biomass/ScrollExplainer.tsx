@@ -14,6 +14,8 @@ import { ScrollCondenser } from "./scroll-sections/ScrollCondenser";
 import { ScrollEmissions } from "./scroll-sections/ScrollEmissions";
 import { ScrollSummary } from "./scroll-sections/ScrollSummary";
 import { ScrollProgress } from "./ScrollProgress";
+import { ControlPanel } from "./ControlPanel";
+import { SimulationProvider } from "@/contexts/SimulationContext";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -36,7 +38,6 @@ export const ScrollExplainer = () => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Refresh ScrollTrigger on mount
     ScrollTrigger.refresh();
 
     return () => {
@@ -45,23 +46,28 @@ export const ScrollExplainer = () => {
   }, []);
 
   return (
-    <div ref={containerRef} className="bg-background">
-      {/* Fixed progress indicator */}
-      <ScrollProgress sections={SECTIONS} />
+    <SimulationProvider>
+      <div ref={containerRef} className="bg-background">
+        {/* Fixed control panel */}
+        <ControlPanel />
+        
+        {/* Fixed progress indicator */}
+        <ScrollProgress sections={SECTIONS} />
 
-      {/* Scroll sections */}
-      <ScrollHero />
-      <ScrollCollection />
-      <ScrollStorage />
-      <ScrollPreprocessing />
-      <ScrollFeeding />
-      <ScrollCombustion />
-      <ScrollSteam />
-      <ScrollTurbine />
-      <ScrollGenerator />
-      <ScrollCondenser />
-      <ScrollEmissions />
-      <ScrollSummary />
-    </div>
+        {/* Scroll sections */}
+        <ScrollHero />
+        <ScrollCollection />
+        <ScrollStorage />
+        <ScrollPreprocessing />
+        <ScrollFeeding />
+        <ScrollCombustion />
+        <ScrollSteam />
+        <ScrollTurbine />
+        <ScrollGenerator />
+        <ScrollCondenser />
+        <ScrollEmissions />
+        <ScrollSummary />
+      </div>
+    </SimulationProvider>
   );
 };
